@@ -12,3 +12,5 @@ A free, browser-based PDF flipbook reader with smooth 3D page turns.
 1. Open the site.
 2. Click **Open PDF** and choose a PDF from your device.
 3. Use **Next/Prev** buttons or swipe (mobile) to flip pages.
+# Live Link
+https://jai-bharath.github.io/Book_Reader/
