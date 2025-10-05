@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SkyRead Flipbook</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <style>
+    :root {
+      --sky: #cfe8ff;
+      --deep-sky: #79b9ff;
+      --shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Poppins", sans-serif;
+      background: linear-gradient(180deg, #e8f5ff, var(--sky));
+      color: #0a1a2f;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      overflow-y: auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    header h1 {
+      color: var(--deep-sky);
+      margin: 0;
+      font-size: 1.6rem;
+    }
+
+    .book-container {
+      position: relative;
+      width: 95%;
+      max-width: 900px;
+      height: 85vh;
+      background: white;
+      border-radius: 15px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      perspective: 2000px;
+      touch-action: pan-y;
+    }
+
+    .page {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      transform-origin: left;
+      transition: transform 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+      background: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      backface-visibility: hidden;
+    }
+
+    .page img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      border-radius: 15px;
+    }
+
+    .flipping {
+      transform: rotateY(-180deg);
+      z-index: 3;
+    }
+
+    .controls {
+      margin-top: 12px;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .btn {
+      background: var(--deep-sky);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 18px;
+      font-size: 15px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    .btn:hover { background: var(--sky); }
+
+    input[type=file] { display: none; }
+
+    .page-number {
+      position: absolute;
+      bottom: 10px;
+      right: 15px;
+      background: rgba(0, 0, 0, 0.6);
+      color: white;
+      padding: 4px 10px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 700px) {
+      .book-container {
+        width: 95%;
+        height: 80vh;
+      }
+      header h1 {
+        font-size: 1.3rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>SkyRead Flipbook</h1>
+    <p>Read PDFs like real books — swipe or tap to turn 📖</p>
+  </header>
+
+  <div class="book-container" id="bookContainer">
+    <div class="page" id="pageDisplay"></div>
+    <div class="page-number" id="pageNumber"></div>
+  </div>
+
+  <div class="controls">
+    <input type="file" id="fileInput" accept=".pdf" />
+    <button class="btn" id="openBtn">📘 Open PDF</button>
+    <button class="btn" id="prevBtn">◀ Prev</button>
+    <button class="btn" id="nextBtn">Next ▶</button>
+  </div>
+
+  <script>
+    const pdfjsLib = window['pdfjs-dist/build/pdf'];
+    const fileInput = document.getElementById("fileInput");
+    const openBtn = document.getElementById("openBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    const prevBtn = document.getElementById("prevBtn");
+    const pageDisplay = document.getElementById("pageDisplay");
+    const pageNumber = document.getElementById("pageNumber");
+    const bookContainer = document.getElementById("bookContainer");
+
+    let pdfDoc = null, currentPage = 1, totalPages = 0, isFlipping = false;
+
+    openBtn.onclick = () => fileInput.click();
+
+    fileInput.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async function () {
+        const pdfData = new Uint8Array(this.result);
+        pdfDoc = await pdfjsLib.getDocument({ data: pdfData }).promise;
+        totalPages = pdfDoc.numPages;
+        currentPage = 1;
+        renderPage(currentPage);
+      };
+      reader.readAsArrayBuffer(file);
+    };
+
+    async function renderPage(num) {
+      if (!pdfDoc) return;
+      const page = await pdfDoc.getPage(num);
+      const viewport = page.getViewport({ scale: 2.2 }); // Higher quality
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d");
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+      await page.render({ canvasContext: context, viewport }).promise;
+      const img = document.createElement("img");
+      img.src = canvas.toDataURL();
+      pageDisplay.innerHTML = "";
+      pageDisplay.appendChild(img);
+      pageNumber.textContent = `Page ${currentPage} / ${totalPages}`;
+    }
+
+    async function flipToNext() {
+      if (!pdfDoc || currentPage >= totalPages || isFlipping) return;
+      isFlipping = true;
+      pageDisplay.classList.add("flipping");
+      setTimeout(async () => {
+        currentPage++;
+        await renderPage(currentPage);
+        pageDisplay.classList.remove("flipping");
+        isFlipping = false;
+      }, 900);
+    }
+
+    async function flipToPrev() {
+      if (!pdfDoc || currentPage <= 1 || isFlipping) return;
+      isFlipping = true;
+      pageDisplay.classList.add("flipping");
+      setTimeout(async () => {
+        currentPage--;
+        await renderPage(currentPage);
+        pageDisplay.classList.remove("flipping");
+        isFlipping = false;
+      }, 900);
+    }
+
+    nextBtn.onclick = flipToNext;
+    prevBtn.onclick = flipToPrev;
+
+    // Swipe detection for mobile
+    let touchStartX = 0;
+    bookContainer.addEventListener("touchstart", (e) => {
+      touchStartX = e.touches[0].clientX;
+    });
+    bookContainer.addEventListener("touchend", (e) => {
+      const touchEndX = e.changedTouches[0].clientX;
+      if (touchEndX < touchStartX - 50) flipToNext();
+      else if (touchEndX > touchStartX + 50) flipToPrev();
+    });
+  </script>
+</body>
+</html>
